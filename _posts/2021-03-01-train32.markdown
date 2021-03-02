@@ -1,0 +1,179 @@
+---
+layout: post
+title:  "Train32"
+date:   2021-03-01 22:10:00 +0000
+tags: ctf
+author: f02a8dfe
+---
+All abord the train32!! Enjoy the ride!!
+pwnEd 2, 27th Feb 2021
+
+For this challenge author Sud0 provided a link leading to a series of redirects:
+
+`http://1.1.1.1:13000/RFIE4RYNBINAUAAAAA`
+
+{% highlight http cssclass=nowrap %}
+HTTP/1.0 302 FOUND
+Content-Type: text/html; charset=utf-8
+Content-Length: 243
+Location: http://1.1.1.1:13000/GUSSCEKIAAAADEAAAA
+Server: Werkzeug/1.0.1 Python/3.8.5
+Date: Sun, 28 Feb 2021 23:18:09 GMT
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<title>Redirecting...</title>
+<h1>Redirecting...</h1>
+<p>You should be redirected automatically to target URL: <a href="GUSSCEKIAAAADEAAAA">GUSSCEKIAAAADEAAAA</a>.  If not click the link.
+{% endhighlight %}
+
+
+{% highlight http %}
+HTTP/1.0 302 FOUND
+Content-Type: text/html; charset=utf-8
+Content-Length: 243
+Location: http://1.1.1.1:13000/AZAIAIAAAAH7QABAGA
+Server: Werkzeug/1.0.1 Python/3.8.5
+Date: Sun, 28 Feb 2021 23:18:11 GMT
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<title>Redirecting...</title>
+<h1>Redirecting...</h1>
+<p>You should be redirected automatically to target URL: <a href="AZAIAIAAAAH7QABAGA">AZAIAIAAAAH7QABAGA</a>.  If not click the link.
+{% endhighlight %}
+
+{% highlight http %}
+HTTP/1.0 302 FOUND
+Content-Type: text/html; charset=utf-8
+Content-Length: 243
+Location: http://1.1.1.1:13000/AAAADGES2HIQAP6AH7
+Server: Werkzeug/1.0.1 Python/3.8.5
+Date: Sun, 28 Feb 2021 23:18:12 GMT
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<title>Redirecting...</title>
+<h1>Redirecting...</h1>
+<p>You should be redirected automatically to target URL: <a href="AAAADGES2HIQAP6AH7">AAAADGES2HIQAP6AH7</a>.  If not click the link.
+{% endhighlight %}
+
+etc.
+
+The requests followed the same sequence no matter which URL was used as the starting point. All other requests returned a `500` error.
+
+I wrote a script to capture all the codes:
+
+{% highlight python %}
+#!/usr/bin/env python3
+
+import sys
+import requests
+
+def train32(url):
+    r=requests.head(url, allow_redirects=False)
+    headers = r.headers
+    if 'Location' in headers:
+        print(r.headers['Location'].split("/")[3],end="")
+    if r.status_code == 302:
+        train32(r.headers['Location'])
+
+def main (argv):
+    print(argv[0].split("/")[3],end="")
+    train32(argv[0])
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        main(sys.argv[1:])
+{% endhighlight %}
+
+It produced the following output:
+
+
+<pre class="highlight" style="word-break:break-word;white-space:inherit"> RFIE4RYNBINAUAAAAAGUSSCEKIAAAADEAAAAAZAIAIAAAAH7QABAGAAAAADGES2HIQAP6AH7AD72BPNHSMAAAAVHJFCECVDYTTWZZULO5QQAYBJXK7676X667NDCHAK4R4GVTNM2PHOBAQUORYLTBEHL7V7L6JGHX5HTPYBXUFMABRICFALEBMIAL7ZU7V3VOVVAZOWXUDTHDVZICP6BEVBY35KWH6IWHIF2AWEAIUMA5UDYOW3H2EB6OOYAJNYHX5SIFLXZCZ3XIFSAWEAFCGAOTITEP4MY5FGGWXK6H5KHKFSAWEAKSMDMSKE3KXLFR2RLGAEKAV4CEDEDNYUBQZ6OMXDKKT3FO52RMQFRACUTA3G2H2MASNVTF2UGD7PA2VMQBRICIRQ5QTBWAY2IPIBIDW2PCLLUCZALCAELGDODLZG3LZHSMZVXH76Y5TQCFALIAZKKNN642PFHZPONKLCTZOTMNQNLWMAIUBNYNKZ3HZW27KRB2ZBRUL4W7EFZZPS7WLUKAWEANJJIYO4WXFUXNFHWNQICNXTETNSHM4ARICYQ6WDLKDXOLQLLJOL4H5B6PDZ2BOQFRACFDB7F6IZ3LNTGUNLP36LFMC3HA6SV2FALCBW62RR5LVZZZGIZL2RJS2NGZXASHFXIFSAGEAKSFGNECM2XWNVSDPUZXUU4PLGOAIUBMIDVYKRJNB44NGPEXSTMMY5ZOKL25EWIIYQBKK5WQ2SD2DTODC2M4FTTNTYMOQLEBMIAFRC5HHELGULQO2ZUK5E652BMQBRADNU5XZDR2UZGYBVTDG2Z5OWCK7S7HIF2CWEA4KPFFNGMG6LUCC7RZXJYLNOXLGRLGAEKAVQJTUSBOMA325UAO7LXJL44JXKVSAGFAJCHHQ3O2W62TZIABVJ3P3ZUXCR3GAEKAV4OFS3MNABWUUCPKBTNOI24G7OIMYQBBZ7JSLNICAOWFIWB6LR2LYCZGE5AXICYQCBV6ZSDBGM5VPU2UAJ4YQETH45AXICYQDHXZGLNQDHFFVJWZY2S7XORLEAMKAQ4BTB5TW5362KNMEVNOPBYES6OBW5SQFXA4CL5TATABHDKXQPNVBQ42SC7UKZQBCQFPDRMW3FVIXDF2PPGLSQSOLE6ICYQAB6XBX7R4OQLUBMABRICFALEBMIARIC7QD43UU5OA5OUCRJAAAAAABEUKTSEVZBGBAQ=
+</pre>
+
+Frequency analysis showed the codes consisted of letters A-Z and digits 2-7:
+
+{% highlight python %}
+#!/usr/bin/env python3
+
+import collections
+import pprint
+
+with open("train32.txt", 'r') as urls:
+    print(pprint.pformat(collections.Counter(urls.read())))
+{% endhighlight %}
+
+```markdown
+Counter({'A': 107,
+         'B': 54,
+         'L': 52,
+         'I': 46,
+         'Z': 44,
+         'C': 43,
+         'F': 42,
+         '2': 41,
+         'E': 40,
+         'U': 40,
+         'Q': 39,
+         'O': 39,
+         'N': 38,
+         'K': 37,
+         'H': 36,
+         'X': 36,
+         'G': 35,
+         'D': 35,
+         'M': 35,
+         'S': 34,
+         'T': 33,
+         'W': 33,
+         'R': 32,
+         'Y': 30,
+         'V': 30,
+         '5': 30,
+         '6': 28,
+         '4': 26,
+         '7': 26,
+         'P': 26,
+         '3': 21,
+         'J': 19,
+         '=': 1,
+         '\n': 1})
+```
+
+It was [Base32][base32] encoding. Decoding the text revealed a `PNG` header:
+
+
+<pre class="highlight" style="word-break:break-word;white-space:inherit">$ echo "RFIE4RYNBINAUAAAAAGUSSCEKIAAAADEAAAAAZAIAIAAAAH7QABAGAAAAADGES2HIQAP6AH7AD72BPNHSMAAAAVHJFCECVDYTTWZZULO5QQAYBJXK7676X667NDCHAK4R4GVTNM2PHOBAQUORYLTBEHL7V7L6JGHX5HTPYBXUFMABRICFALEBMIAL7ZU7V3VOVVAZOWXUDTHDVZICP6BEVBY35KWH6IWHIF2AWEAIUMA5UDYOW3H2EB6OOYAJNYHX5SIFLXZCZ3XIFSAWEAFCGAOTITEP4MY5FGGWXK6H5KHKFSAWEAKSMDMSKE3KXLFR2RLGAEKAV4CEDEDNYUBQZ6OMXDKKT3FO52RMQFRACUTA3G2H2MASNVTF2UGD7PA2VMQBRICIRQ5QTBWAY2IPIBIDW2PCLLUCZALCAELGDODLZG3LZHSMZVXH76Y5TQCFALIAZKKNN642PFHZPONKLCTZOTMNQNLWMAIUBNYNKZ3HZW27KRB2ZBRUL4W7EFZZPS7WLUKAWEANJJIYO4WXFUXNFHWNQICNXTETNSHM4ARICYQ6WDLKDXOLQLLJOL4H5B6PDZ2BOQFRACFDB7F6IZ3LNTGUNLP36LFMC3HA6SV2FALCBW62RR5LVZZZGIZL2RJS2NGZXASHFXIFSAGEAKSFGNECM2XWNVSDPUZXUU4PLGOAIUBMIDVYKRJNB44NGPEXSTMMY5ZOKL25EWIIYQBKK5WQ2SD2DTODC2M4FTTNTYMOQLEBMIAFRC5HHELGULQO2ZUK5E652BMQBRADNU5XZDR2UZGYBVTDG2Z5OWCK7S7HIF2CWEA4KPFFNGMG6LUCC7RZXJYLNOXLGRLGAEKAVQJTUSBOMA325UAO7LXJL44JXKVSAGFAJCHHQ3O2W62TZIABVJ3P3ZUXCR3GAEKAV4OFS3MNABWUUCPKBTNOI24G7OIMYQBBZ7JSLNICAOWFIWB6LR2LYCZGE5AXICYQCBV6ZSDBGM5VPU2UAJ4YQETH45AXICYQDHXZGLNQDHFFVJWZY2S7XORLEAMKAQ4BTB5TW5362KNMEVNOPBYES6OBW5SQFXA4CL5TATABHDKXQPNVBQ42SC7UKZQBCQFPDRMW3FVIXDF2PPGLSQSOLE6ICYQAB6XBX7R4OQLUBMABRICFALEBMIARIC7QD43UU5OA5OUCRJAAAAAABEUKTSEVZBGBAQ=" | base32 -d<br /><br />
+�PNG
+▒
+IHDRd��bKGD��������IDATx����n� 
+Y��y�B��0���~�$ǿO7�7�X�(@�_�O�uuj��_��F#�\�
+                                 �נ�q�(�T8�Uc�:
+                                               �X�E▒�xu�}>s���d���wt@�Q▒�&G���Lk]^?Tu@��0l���]e����x"
+                                                                                                     �n(▒g�eƥOewu@��0l�>�  6�.�a���Y�Da�L64��(��-t@��0�5��^O&f�?���(�eJk}�<����,S˦������j������d1��o�����.���(ùk��iOf�m�I�Gg
+                                                                                                         ����\��|?C��:
+   �X�E▒~_#;[fj5oߖV
+                   g�]
+                      m�F=]s��^��i���#��,�bR)�A3W�k!���)Ǭ�( u¢���i�K�lf;�)z�,�bR�hjC����L�g6�
+                                                                                             t@�,EӜ�5k4WI��,�b���GS&�k1�Y��%~_:
+            �X���R��7�A
+S��4����x��lhjPOPf�#\7܆b~�-�b������Y1:v�w�t��M�Y�Ds�nս��
+                                      �X��_fC   �ھ���@�?:
+                                                         �X��|�m��R�6�5/��Y�
+�:���ق` ƫ���a�H_���x��l�E�]=�\�',�@��                                       ��ۻ����sÂK�
+  �X�(@�����:�u�RIEND�B`�
+</pre>
+
+
+
+When written to file the image turned out to be a QR code of the flag:
+
+![train32.png](/images/train32/train32.png)
+
+``` markdown
+$ zbarimg train32.png                                                                                      
+QR-Code:pwnEd{ch00o_Cho00o}
+scanned 1 barcode symbols from 1 images in 0 seconds
+```
+
+
+[base32]: https://en.wikipedia.org/wiki/Base32
